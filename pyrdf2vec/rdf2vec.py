@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import pickle
 import time
 from typing import List, Sequence, Tuple
@@ -11,7 +12,7 @@ from pyrdf2vec.embedders import Embedder, Word2Vec
 from pyrdf2vec.graphs import KG
 from pyrdf2vec.typings import Embeddings, Entities, Literals, SWalk
 from pyrdf2vec.walkers import RandomWalker, Walker
-
+from tqdm import tqdm
 
 @attr.s
 class RDF2VecTransformer:
@@ -101,17 +102,26 @@ class RDF2VecTransformer:
             The RDF2VecTransformer.
 
         """
+
+        self.walk_path = "/home/tim/cardinality_estimator/Datasets/lubm/walks"
         if self.verbose == 2:
             print(self.embedder)
 
-        walks = self.get_walks(kg, entities)
+
+        #walks = self.get_walks(kg, entities)
+        chunk_size = 10000
+        for i in tqdm(range(0, len(entities), chunk_size)):
+            self.get_walks(kg, entities[i:i+chunk_size])
+        walks = []
 
         tic = time.perf_counter()
         self.embedder.fit(walks, is_update)
         toc = time.perf_counter()
 
         if self.verbose >= 1:
-            n_walks = sum([len(entity_walks) for entity_walks in walks])
+            #n_walks = sum([len(entity_walks) for entity_walks in walks])
+            n_walks = len(os.listdir(self.walk_path))
+
             print(f"Fitted {n_walks} walks ({toc - tic:0.4f}s)")
             if len(self._walks) != len(walks):
                 n_walks = sum(
@@ -178,14 +188,15 @@ class RDF2VecTransformer:
         walks: List[List[SWalk]] = []
         tic = time.perf_counter()
         for walker in self.walkers:
-            walks += walker.extract(kg, entities, self.verbose)
+            walks += walker.extract(kg, entities, self.verbose, self.walk_path)
         toc = time.perf_counter()
 
         self._update(self._entities, entities)
-        self._update(self._walks, walks)
+        #self._update(self._walks, walks)
 
         if self.verbose >= 1:
-            n_walks = sum([len(entity_walks) for entity_walks in walks])
+            #n_walks = sum([len(entity_walks) for entity_walks in walks])
+            n_walks = len(os.listdir(self.walk_path))
             print(
                 f"Extracted {n_walks} walks "
                 + f"for {len(entities)} entities ({toc - tic:0.4f}s)"

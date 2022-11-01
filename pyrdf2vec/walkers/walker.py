@@ -10,6 +10,9 @@ from pyrdf2vec.graphs import KG, Vertex
 from pyrdf2vec.samplers import Sampler, UniformSampler
 from pyrdf2vec.typings import Entities, EntityWalks, SWalk
 
+import os
+import json
+
 from pyrdf2vec.utils.validation import (  # isort: skip
     _check_max_depth,
     _check_jobs,
@@ -109,7 +112,7 @@ class Walker(ABC):
         self.sampler.random_state = self.random_state
 
     def extract(
-        self, kg: KG, entities: Entities, verbose: int = 0
+        self, kg: KG, entities: Entities, verbose: int = 0, walk_path=None
     ) -> List[List[SWalk]]:
         """Fits the provided sampling strategy and then calls the
         private _extract method that is implemented for each of the
@@ -156,13 +159,21 @@ class Walker(ABC):
         self._entities |= set(entities)
 
         with multiprocessing.Pool(process, self._init_worker, [kg]) as pool:
+            #tqdm(
+            #    pool.imap(self._proc, (entities, walk_path)),
+            #    total=len(entities),
+            #    disable=True if verbose == 0 else False,
+            #)
             res = list(
                 tqdm(
                     pool.imap(self._proc, entities),
                     total=len(entities),
+                    #disable=True,
                     disable=True if verbose == 0 else False,
+
                 )
             )
+            res = []
         return self._post_extract(res)
 
     @abstractmethod
@@ -205,11 +216,13 @@ class Walker(ABC):
             provided entities; number of column equal to the embedding size.
 
         """
+        return []
         return list(
             walks
             for entity_to_walks in res
             for walks in entity_to_walks.values()
         )
+
 
     def _proc(self, entity: str) -> EntityWalks:
         """Executed by each process.
@@ -222,4 +235,17 @@ class Walker(ABC):
 
         """
         global kg
+        walk_path = "/media/tim/vol2/walks"
+
+        entity_walks = self._extract(kg, Vertex(entity))[entity]
+        w = 0
+        for walk in entity_walks:
+            with open(os.path.join(walk_path, entity.replace("/", "|") + "_" + str(w) + ".json"), "w") as fp:
+                json.dump(walk, fp)
+            w += 1
         return self._extract(kg, Vertex(entity))  # type: ignore
+        #return None
+
+
+
+

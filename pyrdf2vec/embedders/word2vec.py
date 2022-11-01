@@ -8,6 +8,26 @@ from gensim.models.word2vec import Word2Vec as W2V
 from pyrdf2vec.embedders import Embedder
 from pyrdf2vec.typings import Embeddings, Entities, SWalk
 
+import random
+import json
+import os
+
+class MyWalks(object):
+    def __init__(self, dirname):
+        self.dirname = dirname
+        self.files = os.listdir(self.dirname)
+        random.shuffle(self.files)
+
+    def __iter__(self):
+        for fwalk in self.files:
+            with open(os.path.join(self.dirname, fwalk), "r") as f:
+                try:
+                    walk = tuple(json.load(f))
+                except:
+                    print("PROBLEM WITH: ", fwalk)
+                    pass
+            yield walk
+
 
 @attr.s(init=False)
 class Word2Vec(Embedder):
@@ -48,12 +68,18 @@ class Word2Vec(Embedder):
             The fitted Word2Vec model.
 
         """
-        corpus = [walk for entity_walks in walks for walk in entity_walks]
+        #corpus = [walk for entity_walks in walks for walk in entity_walks]
+        corpus = MyWalks("/home/tim/cardinality_estimator/Datasets/lubm/walks")
+
+        print("Building Vocabulary...")
         self._model.build_vocab(corpus, update=is_update)
+        print("Training Model...")
         self._model.train(
             corpus,
             total_examples=self._model.corpus_count,
-            epochs=self._model.epochs,
+            #epochs=self._model.epochs,
+            epochs=1,
+
         )
         return self
 
@@ -69,6 +95,8 @@ class Word2Vec(Embedder):
             The features vector of the provided entities.
 
         """
+
+
         if not all([entity in self._model.wv for entity in entities]):
             raise ValueError(
                 "The entities must have been provided to fit() first "
